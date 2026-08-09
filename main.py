@@ -5,15 +5,17 @@ import requests
 from telegram import Update, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-TOKEN = os.environ.get("BOT_TOKEN")
+# ضع توكن البوت المباشر هنا تجنباً لمشاكل متغيرات البيئة على PythonAnywhere
+TOKEN = os.environ.get("BOT_TOKEN", "ضع_التوكن_الخاص_بك_هنا")
 
-# دالة لقراءة معاني الكلمات من ملف words.json الخارجي
+# دالة لقراءة معاني الكلمات من ملف questions.json
 def load_word_quizzes():
     try:
-        with open("words.json", "r", encoding="utf-8") as file:
+        # تم تعديل اسم الملف إلى questions.json ليطابق ملف الأسئلة
+        with open("questions.json", "r", encoding="utf-8") as file:
             return json.load(file)
     except Exception as e:
-        print(f"Error loading words.json: {e}")
+        print(f"Error loading questions.json: {e}")
         return []
 
 # 1. أمر البداية
@@ -29,7 +31,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     welcome_text = (
         "أهلاً بك! 👋\n\n"
-        "أنا بوت يقدم آيات قرآنية، تلاوات، وااختبارات تفاعلية.\n\n"
+        "أنا بوت يقدم آيات قرآنية، تلاوات، واختبارات تفاعلية.\n\n"
         "**الأوامر المتاحة:**\n"
         "• /ayah - آية عشوائية مكتوبة\n"
         "• /recitation - آية عشوائية بصوت عبد الباسط\n"
@@ -42,7 +44,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 2. أمر الآية المكتوبة
 async def ayah(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.get("https://api.alquran.cloud/v1/ayah/random/ar.alafasy")
+        response = requests.get("https://api.alquran.cloud/v1/ayah/random/ar.alafasy", timeout=10)
         if response.status_code == 200:
             data = response.json()["data"]
             text = data["text"]
@@ -51,13 +53,14 @@ async def ayah(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             message = f"﴿ {text} ﴾\n\n[سورة {surah_name} - الآية {ayah_num}]"
             await update.message.reply_text(message)
-    except Exception:
+    except Exception as e:
+        print(f"Ayah error: {e}")
         await update.message.reply_text("حدث خطأ، حاول مرة أخرى.")
 
 # 3. أمر التلاوة الصوتية
 async def recitation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.get("https://api.alquran.cloud/v1/ayah/random/ar.abdulsamad")
+        response = requests.get("https://api.alquran.cloud/v1/ayah/random/ar.abdulsamad", timeout=10)
         if response.status_code == 200:
             data = response.json()["data"]
             audio_url = data["audio"]
@@ -66,13 +69,14 @@ async def recitation(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             caption = f"🎙 بصوت الشيخ عبد الباسط عبد الصمد (مجود)\n📖 سورة {surah_name} - الآية {ayah_num}"
             await update.message.reply_audio(audio=audio_url, caption=caption)
-    except Exception:
+    except Exception as e:
+        print(f"Recitation error: {e}")
         await update.message.reply_text("حدث خطأ، حاول مرة أخرى.")
 
 # 4. أمر سؤال السورة (عشوائي من الـ API)
 async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.get("https://api.alquran.cloud/v1/ayah/random/ar.alafasy")
+        response = requests.get("https://api.alquran.cloud/v1/ayah/random/ar.alafasy", timeout=10)
         if response.status_code == 200:
             data = response.json()["data"]
             text = data["text"]
@@ -81,7 +85,7 @@ async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
             other_surahs = [
                 "البقرة", "آل عمران", "النساء", "المائدة", "الأنعام", "الأعراف", 
                 "الأنفال", "التوبة", "يونس", "هود", "يوسف", "الرعد", "إبراهيم", 
-                "الحجر", "النحل", "الإسراء", "الكهف", "مريم", "طه", "الأنبياء"
+                "الحجر", "النحل", "الإسراء", "الكهف", "مريم", "طه", "الأنبيآء"
             ]
             
             filtered_surahs = [s for s in other_surahs if s != correct_surah]
@@ -95,34 +99,36 @@ async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             await context.bot.send_poll(
                 chat_id=update.effective_chat.id,
-                question=question[:300],
-                options=[f"سورة {opt}" for opt in options],
+                question=question[:290], # حد تلجرام للسؤال هو 300 حرف
+                options=[f"سورة {opt}"[:100] for opt in options], # حد الخيار 100 حرف
                 type="quiz",
                 correct_option_id=correct_option_id,
                 is_anonymous=False
             )
-    except Exception:
+    except Exception as e:
+        print(f"Quiz error: {e}")
         await update.message.reply_text("حدث خطأ، حاول مرة أخرى.")
 
-# 5. أمر سؤال معاني الكلمات (من ملف words.json)
+# 5. أمر سؤال معاني الكلمات (من ملف questions.json)
 async def meaning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         quizzes = load_word_quizzes()
         if not quizzes:
-            await update.message.reply_text("لا توجد أسئلة معاني متوفرة حالياً.")
+            await update.message.reply_text("لا توجد أسئلة معاني متوفرة حالياً، تأكد من وجود ملف questions.json.")
             return
 
         quiz_data = random.choice(quizzes)
         
         await context.bot.send_poll(
             chat_id=update.effective_chat.id,
-            question=quiz_data["question"],
-            options=quiz_data["options"],
+            question=quiz_data["question"][:290],
+            options=[opt[:100] for opt in quiz_data["options"]],
             type="quiz",
             correct_option_id=quiz_data["correct"],
             is_anonymous=False
         )
-    except Exception:
+    except Exception as e:
+        print(f"Meaning error: {e}")
         await update.message.reply_text("حدث خطأ أثناء إرسال سؤال المعاني، حاول مرة أخرى.")
 
 if __name__ == "__main__":
@@ -134,4 +140,5 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("quiz", quiz))
     app.add_handler(CommandHandler("meaning", meaning))
     
+    print("Bot is starting...")
     app.run_polling()
