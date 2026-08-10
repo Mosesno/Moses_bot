@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import json
 import random
@@ -40,17 +41,23 @@ SURAH_NAMES = [
 REQUEST_TIMEOUT = 10
 
 
+# Arabic diacritics (tashkeel/harakat) unicode ranges — stripped so surah
+# names always compare and display the same regardless of which marks the
+# API happens to include on a given verse.
+ARABIC_DIACRITICS_RE = re.compile(
+    r"[\u0610-\u061A\u064B-\u065F\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED\u08D4-\u08E1\u08E3-\u08FF]"
+)
+
+
 def normalize_surah_name(name):
-    """Strip a leading 'سورة' / 'سُورَةُ' (with or without diacritics) so
-    surah names from the API and from SURAH_NAMES are always bare —
-    otherwise formatting 'سورة {name}' later double-prefixes the API
-    name and visually gives away the correct quiz answer."""
-    prefix_variants = ("سُورَةُ", "سورة")
-    stripped = name.strip()
-    for prefix in prefix_variants:
-        if stripped.startswith(prefix):
-            stripped = stripped[len(prefix):].strip()
-            break
+    """Strip diacritics and a leading 'سورة' so surah names from the API
+    and from SURAH_NAMES are always bare, plain text — otherwise
+    formatting 'سورة {name}' later double-prefixes the API name (and/or
+    mixes diacritic styles) and visually gives away the correct quiz
+    answer."""
+    stripped = ARABIC_DIACRITICS_RE.sub("", name).strip()
+    if stripped.startswith("سورة"):
+        stripped = stripped[len("سورة"):].strip()
     return stripped
 
 
