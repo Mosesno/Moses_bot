@@ -40,6 +40,20 @@ SURAH_NAMES = [
 REQUEST_TIMEOUT = 10
 
 
+def normalize_surah_name(name):
+    """Strip a leading 'سورة' / 'سُورَةُ' (with or without diacritics) so
+    surah names from the API and from SURAH_NAMES are always bare —
+    otherwise formatting 'سورة {name}' later double-prefixes the API
+    name and visually gives away the correct quiz answer."""
+    prefix_variants = ("سُورَةُ", "سورة")
+    stripped = name.strip()
+    for prefix in prefix_variants:
+        if stripped.startswith(prefix):
+            stripped = stripped[len(prefix):].strip()
+            break
+    return stripped
+
+
 def load_word_quizzes():
     """Load and validate the word-meaning quiz bank from questions.json.
 
@@ -160,7 +174,7 @@ async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response.raise_for_status()
         data = response.json()["data"]
         text = data["text"]
-        correct_surah = data["surah"]["name"]
+        correct_surah = normalize_surah_name(data["surah"]["name"])
 
         filtered_surahs = [s for s in SURAH_NAMES if s != correct_surah]
         wrong_options = random.sample(filtered_surahs, min(3, len(filtered_surahs)))
@@ -197,12 +211,23 @@ async def meaning(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     quiz_data = random.choice(quizzes)
     try:
+        # Shuffle options at send-time so the correct answer's position
+        # doesn't leak from how questions.json happens to be authored
+        # (many entries in the data have the correct answer first).
+        indexed_options = list(enumerate(quiz_data["options"]))
+        random.shuffle(indexed_options)
+        shuffled_options = [opt for _, opt in indexed_options]
+        new_correct_id = next(
+            new_idx for new_idx, (orig_idx, _) in enumerate(indexed_options)
+            if orig_idx == quiz_data["correct"]
+        )
+
         await context.bot.send_poll(
             chat_id=update.effective_chat.id,
             question=quiz_data["question"][:290],
-            options=[opt[:100] for opt in quiz_data["options"]],
+            options=[opt[:100] for opt in shuffled_options],
             type="quiz",
-            correct_option_id=quiz_data["correct"],
+            correct_option_id=new_correct_id,
             is_anonymous=False,
         )
     except Exception as e:
