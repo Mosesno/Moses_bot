@@ -8,21 +8,13 @@ import requests
 from telegram import Update, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# ---------------------------------------------------------------
-# Logging setup — replaces print() so you get real timestamps and
-# stack traces in the PythonAnywhere log files.
-# ---------------------------------------------------------------
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("moses_bot")
 
-# ---------------------------------------------------------------
-# Token: must come from the environment. No hardcoded placeholder —
-# fail loudly and immediately instead of trying to run with a fake
-# token and getting a confusing error from Telegram later.
-# ---------------------------------------------------------------
 TOKEN = os.environ.get("BOT_TOKEN")
 if not TOKEN:
     logger.error("BOT_TOKEN environment variable is not set. Exiting.")
@@ -41,9 +33,6 @@ SURAH_NAMES = [
 REQUEST_TIMEOUT = 10
 
 
-# Arabic diacritics (tashkeel/harakat) unicode ranges — stripped so surah
-# names always compare and display the same regardless of which marks the
-# API happens to include on a given verse.
 ARABIC_DIACRITICS_RE = re.compile(
     r"[\u0610-\u061A\u064B-\u065F\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED\u08D4-\u08E1\u08E3-\u08FF]"
 )
@@ -249,9 +238,7 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
-    # Fail fast at startup if the questions file is broken, so you find
-    # out from the PythonAnywhere console instead of from a silent
-    # /meaning failure days later.
+    
     quizzes = load_word_quizzes()
     logger.info("Loaded %d word-meaning quiz entries.", len(quizzes))
 
